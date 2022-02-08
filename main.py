@@ -1,105 +1,95 @@
-from tkinter.messagebox import showinfo
 from tkinter.ttk import Combobox
-import requests
-from bs4 import BeautifulSoup
-from api.Kiwoom import *
 import sys
 from strategy.RSIStrategy import *
 from tkinter import *
 from util.time_helper import *
-from time import strftime
 
 app = QApplication(sys.argv)
-kiwoom = Kiwoom()
-account_number = kiwoom.get_account_number()
-# account_number = "7004450631;8015878911;"
-account_number = account_number.split(';')
-num = 0
-for i in account_number[:-1]:
-    num += 1
 
-# Kiwoom > 예수금 확인
-deposit = kiwoom.get_deposit_tal(account_number[0])
-# rsi_strategy = RSIStrategy()
-# rsi_strategy.start()
+# 필요할 때마다 kiwoom API 가져다 쓰기 위해 instance 생성
+mKiwoomInstance = Kiwoom()
+
+# 계좌를 가져오며, 1개 이상의 계좌번호를 가져올 경우, Combobox에 하나씩 넣기 위해 구성
+mAccountNumbers = mKiwoomInstance.get_account_number()
+mAccountNumbers = mAccountNumbers.split(';')
+mAccountTotalNum = 0
+for i in mAccountNumbers[:-1]:
+    mAccountTotalNum += 1
+
+mDeposit = mKiwoomInstance.get_deposit_tal(mAccountNumbers[0])  # 예수금 가져오기
+mDepositVar = StringVar()
+mMarketOpenVar = StringVar()
 
 
-# Create instance
+def getBalance():
+    balanceLBox.delete(0, END)
+    # 잔고 가져오기
+    balance = mKiwoomInstance.get_balance_tal(accountCBox.get())
+    print(balance)
+    for key, value in balance.items():
+        for key1, value1 in value.items():
+            balanceLBox.insert(END, str(key1) + " : " + str(value1))
+        balanceLBox.insert(END, "......")
+    accountCBox.config(state='disabled')
+
+
+def changeAccount(event):
+    global mDeposit
+    mDeposit = mKiwoomInstance.get_deposit_tal(accountCBox.get())
+    mDepositVar.set("{:,}".format(mDeposit) + "원")
+    if not check_transaction_open():
+        mMarketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
+        marketOpenLabel.config(fg="red")
+    else:
+        mMarketOpenVar.set("☆★ 장시간 입니다~!")
+        marketOpenLabel.config(fg="green")
+
+
+# Tkinter GUI 사용
 window = Tk()
 window.title("Thanks A Lot")
 window.geometry("1050x600")
 window.resizable(0, 0)
 
-labelFrame = LabelFrame(window, text="자산현황", padx=10, pady=10)
-labelFrame.pack()
-labelFrame.place(x=20, y=20)
+# 1st 요구사항 : 자산현황 확인. (잔고, 예수금 출력)
+balanceLFrame = LabelFrame(window, text="자산현황", padx=10, pady=10)
+balanceLFrame.pack()
+balanceLFrame.place(x=20, y=20)
 
-number = StringVar()
-number_chosen = Combobox(labelFrame, width=12, textvariable=number, state='readonly')
-number_chosen['values'] = [account_number[m] for m in range(0, num)]
-number_chosen.current(0)
-number_chosen.grid(row=0, column=0)
-
-
-def getBalance():
-    listBox.delete(0, END)
-    # Kiwoom > 잔고 확인
-    position = kiwoom.get_balance_tal(number_chosen.get())
-    print(position)
-    for key, value in position.items():
-        for key1, value1 in value.items():
-            listBox.insert(END, str(key1) + " : " + str(value1))
-        listBox.insert(END, "......")
-    number_chosen.config(state='disabled')
-
+accountCBox = Combobox(balanceLFrame, width=12, state='readonly')
+accountCBox['values'] = [mAccountNumbers[m] for m in range(0, mAccountTotalNum)]
+accountCBox.current(0)
+accountCBox.grid(row=0, column=0)
 
 # 잔고 : 현재 보유 중인 종목들.
-# TR (opw00018: 계좌평가잔고내역요청) 조회
-buttonGetBalance = Button(labelFrame, text="잔고 불러오기", command=getBalance)  # bg="green"
-buttonGetBalance.grid(row=0, column=1)
+getBalanceButton = Button(balanceLFrame, text="잔고 불러오기", command=getBalance)
+getBalanceButton.grid(row=0, column=1)
 
-depositVar = StringVar()
-depositVar.set("{:,}".format(deposit) + "원")
+mDepositVar.set("{:,}".format(mDeposit) + "원")
 
-depositTitleLabel = Label(labelFrame, text="보유현금(예수금):")
+depositTitleLabel = Label(balanceLFrame, text="보유현금(예수금):")
 depositTitleLabel.grid(row=1, column=0)
-depositLabel = Label(labelFrame, textvariable=depositVar, width=15)
-depositLabel.grid(row=1, column=1)
+depositContentsLabel = Label(balanceLFrame, textvariable=mDepositVar, width=15)
+depositContentsLabel.grid(row=1, column=1)
 
-listBox = Listbox(labelFrame)
-listBox.grid(row=2, column=0)
+balanceLBox = Listbox(balanceLFrame)
+balanceLBox.grid(row=2, column=0)
 
-marketOpenVar = StringVar()
 if not check_transaction_open():
-    marketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
+    mMarketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
 else:
-    marketOpenVar.set("☆★ 장시간 입니다~!")
+    mMarketOpenVar.set("☆★ 장시간 입니다~!")
 
-marketOpenLabel = Label(window, textvariable=marketOpenVar)
+marketOpenLabel = Label(window, textvariable=mMarketOpenVar)
 marketOpenLabel.place(x=20, y=270)
+
 if not check_transaction_open():
     marketOpenLabel.config(fg="red")
 else:
     marketOpenLabel.config(fg="green")
 
-
-def account_changed(event):
-    global deposit
-    deposit = kiwoom.get_deposit_tal(number_chosen.get())
-    depositVar.set("{:,}".format(deposit) + "원")
-    if not check_transaction_open():
-        marketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
-        marketOpenLabel.config(fg="red")
-    else:
-        marketOpenVar.set("☆★ 장시간 입니다~!")
-        marketOpenLabel.config(fg="green")
-    # showinfo(
-    #     title='Result',
-    #     message=f'You selected {number_chosen.get()}, {"{:,}".format(deposit)}원!'
-    # )
-
-
-number_chosen.bind('<<ComboboxSelected>>', account_changed)
+# Todo : Refactoring from here
+accountCBox.bind('<<ComboboxSelected>>', changeAccount)
 
 labelFrame_2 = LabelFrame(window, text="매수하기", padx=10, pady=10)
 labelFrame_2.pack()
@@ -124,8 +114,8 @@ stockName.set("empty")
 currentPrice = StringVar()
 currentPrice.set("- 원")
 
-kospi_code_list = kiwoom.get_code_list_by_market("0")
-kosdak_code_list = kiwoom.get_code_list_by_market("10")
+kospi_code_list = mKiwoomInstance.get_code_list_by_market("0")
+kosdak_code_list = mKiwoomInstance.get_code_list_by_market("10")
 
 
 def SearchName():
@@ -137,9 +127,9 @@ def SearchName():
         print("ok_kosdak")
         flag = True
     if flag:
-        code_name = kiwoom.get_master_code_name(codeEdit.get())
+        code_name = mKiwoomInstance.get_master_code_name(codeEdit.get())
         stockName.set(code_name)
-        current_price = kiwoom.get_now_price_tal(codeEdit.get())
+        current_price = mKiwoomInstance.get_now_price_tal(codeEdit.get())
         currentPrice.set("{:,}원".format(current_price))
         print(f"종목명 : {code_name}, 현재가 : {current_price}")
     else:
@@ -209,13 +199,14 @@ buyResultText.set("...")
 refreshValue = 0
 refreshText = ""
 
+
 def try2BUY():
     global refreshValue, refreshText
     refreshValue += 1
     if refreshValue > 5:
         refreshValue = 0
         refreshText = ""
-    #listBoxBuy.delete(0, END)
+    # listBoxBuy.delete(0, END)
     refreshText = refreshText + "*"
     helpText = ""
     flag = False
@@ -239,7 +230,8 @@ def try2BUY():
         buyResultText.set(helpText)
         listBoxBuy.insert(0, helpText)
         buyResultLabel.config(fg="green")
-        orderResult = kiwoom.send_order_tal('send_buy_order', '1002', 1, code, count, 0, '03', number_chosen.get())
+        orderResult = mKiwoomInstance.send_order_tal('send_buy_order', '1002', 1, code, count, 0, '03',
+                                                     accountCBox.get())
         print(f"시장가 주문 결과 : ", orderResult)
     else:  # 지정가
         code = codeEdit.get()
@@ -249,7 +241,8 @@ def try2BUY():
         buyResultText.set(helpText)
         listBoxBuy.insert(0, helpText)
         buyResultLabel.config(fg="blue")
-        orderResult = kiwoom.send_order_tal('send_buy_order', '1002', 1, code, count, price, '00', number_chosen.get())
+        orderResult = mKiwoomInstance.send_order_tal('send_buy_order', '1002', 1, code, count, price, '00',
+                                                     accountCBox.get())
         print(f"시장가 주문 결과 : ", orderResult)
 
 
@@ -261,7 +254,6 @@ buyButton.grid(row=6, column=1)
 
 listBoxBuy = Listbox(labelFrame_2, width=40, height=5)
 listBoxBuy.grid(row=7)
-
 
 labelFrame_3 = LabelFrame(window, text="매도하기", padx=10, pady=10)
 labelFrame_3.pack()
@@ -306,7 +298,7 @@ def getMyList():
     entryBoxes = []
     entryCountBoxes = []
 
-    position = kiwoom.get_balance_tal(number_chosen.get())
+    position = mKiwoomInstance.get_balance_tal(accountCBox.get())
     for key, value in position.items():
         for key1, value1 in value.items():
             if "종목명" in key1:
@@ -352,12 +344,12 @@ def sellStock():
                   f"/ 금액:{ask} "
                   f"/ 종목코드:{code}")
             if isOnSell:  # 시장가
-                order_result = kiwoom.send_order_tal('send_sell_order', '1002', 2, code, quantity, 0, '03',
-                                                     number_chosen.get())
+                order_result = mKiwoomInstance.send_order_tal('send_sell_order', '1002', 2, code, quantity, 0, '03',
+                                                              accountCBox.get())
                 print(f"sellStock(시장가) - {order_result}")
             else:  # 지정가
-                order_result = kiwoom.send_order_tal('send_sell_order', '1002', 2, code, quantity, ask, '00',
-                                                     number_chosen.get())
+                order_result = mKiwoomInstance.send_order_tal('send_sell_order', '1002', 2, code, quantity, ask, '00',
+                                                              accountCBox.get())
                 print(f"sellStock(지정가) - {order_result}")
 
 
@@ -405,18 +397,19 @@ sellLabel2.grid(row=2, column=1)
 sellLabel2 = Label(labelFrame_3, text="금액(원)")
 sellLabel2.grid(row=2, column=2)
 
-
 labelFrame_4 = LabelFrame(window, text="주문 예약 현황", padx=10, pady=10)
 labelFrame_4.pack()
 labelFrame_4.place(x=20, y=330)
 
+
 def callReserv():
     print("\nreserv")
-    orders = kiwoom.get_order_tal(number_chosen.get())
+    orders = mKiwoomInstance.get_order_tal(accountCBox.get())
     empty = ""
     print(orders)
     listBoxResev.insert(0, empty)
     listBoxResev.insert(0, orders)
+
 
 on_button_reserv_call = Button(labelFrame_4, text="불러오기", command=callReserv)
 on_button_reserv_call.grid(row=1, column=0)
@@ -424,11 +417,6 @@ emptyLine_4 = Label(labelFrame_4, text="")
 emptyLine_4.grid(row=2, column=0)
 listBoxResev = Listbox(labelFrame_4, width=80, height=10)
 listBoxResev.grid(row=3)
-
-# showinfo(
-#     title='Result',
-#     message=f'You selected {number_chosen.get()}, {"{:,}".format(deposit)}원!'
-# )
 
 codeEdit.focus_force()
 window.mainloop()
