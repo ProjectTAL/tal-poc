@@ -17,32 +17,11 @@ for i in mAccountNumbers[:-1]:
     mAccountTotalNum += 1
 
 mDeposit = mKiwoomInstance.get_deposit_tal(mAccountNumbers[0])  # 예수금 가져오기
-mDepositVar = StringVar()
-mMarketOpenVar = StringVar()
 
 
-def getBalance():
-    balanceLBox.delete(0, END)
-    # 잔고 가져오기
-    balance = mKiwoomInstance.get_balance_tal(accountCBox.get())
-    print(balance)
-    for key, value in balance.items():
-        for key1, value1 in value.items():
-            balanceLBox.insert(END, str(key1) + " : " + str(value1))
-        balanceLBox.insert(END, "......")
-    accountCBox.config(state='disabled')
 
 
-def changeAccount(event):
-    global mDeposit
-    mDeposit = mKiwoomInstance.get_deposit_tal(accountCBox.get())
-    mDepositVar.set("{:,}".format(mDeposit) + "원")
-    if not check_transaction_open():
-        mMarketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
-        marketOpenLabel.config(fg="red")
-    else:
-        mMarketOpenVar.set("☆★ 장시간 입니다~!")
-        marketOpenLabel.config(fg="green")
+
 
 
 # Tkinter GUI 사용
@@ -61,10 +40,22 @@ accountCBox['values'] = [mAccountNumbers[m] for m in range(0, mAccountTotalNum)]
 accountCBox.current(0)
 accountCBox.grid(row=0, column=0)
 
+def getBalance():
+    balanceLBox.delete(0, END)
+    # 잔고 가져오기
+    balance = mKiwoomInstance.get_balance_tal(accountCBox.get())
+    print(balance)
+    for key, value in balance.items():
+        for key1, value1 in value.items():
+            balanceLBox.insert(END, str(key1) + " : " + str(value1))
+        balanceLBox.insert(END, "......")
+    accountCBox.config(state='disabled')
+
 # 잔고 : 현재 보유 중인 종목들.
 getBalanceButton = Button(balanceLFrame, text="잔고 불러오기", command=getBalance)
 getBalanceButton.grid(row=0, column=1)
 
+mDepositVar = StringVar()
 mDepositVar.set("{:,}".format(mDeposit) + "원")
 
 depositTitleLabel = Label(balanceLFrame, text="보유현금(예수금):")
@@ -75,6 +66,7 @@ depositContentsLabel.grid(row=1, column=1)
 balanceLBox = Listbox(balanceLFrame)
 balanceLBox.grid(row=2, column=0)
 
+mMarketOpenVar = StringVar()
 if not check_transaction_open():
     mMarketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
 else:
@@ -87,6 +79,17 @@ if not check_transaction_open():
     marketOpenLabel.config(fg="red")
 else:
     marketOpenLabel.config(fg="green")
+
+def changeAccount(event):
+    global mDeposit
+    mDeposit = mKiwoomInstance.get_deposit_tal(accountCBox.get())
+    mDepositVar.set("{:,}".format(mDeposit) + "원")
+    if not check_transaction_open():
+        mMarketOpenVar.set("※ 장시간이 아닙니다 (09:00~15:20)")
+        marketOpenLabel.config(fg="red")
+    else:
+        mMarketOpenVar.set("☆★ 장시간 입니다~!")
+        marketOpenLabel.config(fg="green")
 
 # Todo : Refactoring from here
 accountCBox.bind('<<ComboboxSelected>>', changeAccount)
